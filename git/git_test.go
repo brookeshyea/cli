@@ -2,6 +2,7 @@ package git
 
 import (
 	"os/exec"
+	"reflect"
 	"testing"
 
 	"github.com/cli/cli/internal/run"
@@ -15,9 +16,9 @@ func Test_UncommittedChangeCount(t *testing.T) {
 		Output   string
 	}
 	cases := []c{
-		c{Label: "no changes", Expected: 0, Output: ""},
-		c{Label: "one change", Expected: 1, Output: " M poem.txt"},
-		c{Label: "untracked file", Expected: 2, Output: " M poem.txt\n?? new.txt"},
+		{Label: "no changes", Expected: 0, Output: ""},
+		{Label: "one change", Expected: 1, Output: " M poem.txt"},
+		{Label: "untracked file", Expected: 2, Output: " M poem.txt\n?? new.txt"},
 	}
 
 	teardown := run.SetPrepareCmd(func(*exec.Cmd) run.Runnable {
@@ -38,22 +39,40 @@ func Test_UncommittedChangeCount(t *testing.T) {
 }
 
 func Test_CurrentBranch(t *testing.T) {
-	cs, teardown := test.InitCmdStubber()
-	defer teardown()
-
-	expected := "branch-name"
-
-	cs.Stub(expected)
-
-	result, err := CurrentBranch()
-	if err != nil {
-		t.Errorf("got unexpected error: %w", err)
+	type c struct {
+		Stub     string
+		Expected string
 	}
-	if len(cs.Calls) != 1 {
-		t.Errorf("expected 1 git call, saw %d", len(cs.Calls))
+	cases := []c{
+		{
+			Stub:     "branch-name\n",
+			Expected: "branch-name",
+		},
+		{
+			Stub:     "refs/heads/branch-name\n",
+			Expected: "branch-name",
+		},
+		{
+			Stub:     "refs/heads/branch\u00A0with\u00A0non\u00A0breaking\u00A0space\n",
+			Expected: "branch\u00A0with\u00A0non\u00A0breaking\u00A0space",
+		},
 	}
-	if result != expected {
-		t.Errorf("unexpected branch name: %s instead of %s", result, expected)
+
+	for _, v := range cases {
+		cs, teardown := test.InitCmdStubber()
+		cs.Stub(v.Stub)
+
+		result, err := CurrentBranch()
+		if err != nil {
+			t.Errorf("got unexpected error: %w", err)
+		}
+		if len(cs.Calls) != 1 {
+			t.Errorf("expected 1 git call, saw %d", len(cs.Calls))
+		}
+		if result != v.Expected {
+			t.Errorf("unexpected branch name: %s instead of %s", result, v.Expected)
+		}
+		teardown()
 	}
 }
 
@@ -67,9 +86,8 @@ func Test_CurrentBranch_detached_head(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected an error")
 	}
-	expectedError := "git: not on any branch"
-	if err.Error() != expectedError {
-		t.Errorf("got unexpected error: %s instead of %s", err.Error(), expectedError)
+	if err != ErrNotOnAnyBranch {
+		t.Errorf("got unexpected error: %s instead of %s", err, ErrNotOnAnyBranch)
 	}
 	if len(cs.Calls) != 1 {
 		t.Errorf("expected 1 git call, saw %d", len(cs.Calls))
@@ -94,4 +112,63 @@ func Test_CurrentBranch_unexpected_error(t *testing.T) {
 	if len(cs.Calls) != 1 {
 		t.Errorf("expected 1 git call, saw %d", len(cs.Calls))
 	}
+}
+
+func TestParseExtraCloneArgs(t *testing.T) {
+	type Wanted struct {
+		args []string
+		dir  string
+	}
+	tests := []struct {
+		name string
+		args []string
+		want Wanted
+	}{
+		{
+			name: "args and target",
+			args: []string{"target_directory", "-o", "upstream", "--depth", "1"},
+			want: Wanted{
+				args: []string{"-o", "upstream", "--depth", "1"},
+				dir:  "target_directory",
+			},
+		},
+		{
+			name: "only args",
+			args: []string{"-o", "upstream", "--depth", "1"},
+			want: Wanted{
+				args: []string{"-o", "upstream", "--depth", "1"},
+				dir:  "",
+			},
+		},
+		{
+			name: "only target",
+			args: []string{"target_directory"},
+			want: Wanted{
+				args: []string{},
+				dir:  "target_directory",
+			},
+		},
+		{
+			name: "no args",
+			args: []string{},
+			want: Wanted{
+				args: []string{},
+				dir:  "",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			args, dir := parseCloneArgs(tt.args)
+			got := Wanted{
+				args: args,
+				dir:  dir,
+			}
+
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("got %#v want %#v", got, tt.want)
+			}
+		})
+	}
+
 }
