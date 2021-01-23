@@ -1,5 +1,9 @@
 {
     "search.exclude": {
         "vendor/**": true
-    }
+    },
+    "files.watcherExclude": {
+        "**/target": true
+    },
+    "powershell.codeFormatting.addWhitespaceAroundPipe": true
 }
