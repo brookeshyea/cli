@@ -2,3 +2,5 @@
 [0m2021.01.23 14:51:12 INFO  time: initialize in 6.64s[0m
 [0m2021.01.23 14:52:40 WARN  Build server is not auto-connectable.[0m
 [0m2021.01.23 14:52:40 WARN  no build tool detected in workspace 'C:\Users\brook\.platformio\platforms\windows_x86\builder\cli'. The most common cause for this problem is that the editor was opened in the wrong working directory, for example if you use sbt then the workspace directory should contain build.sbt. [0m
+Jan. 23, 2021 3:49:09 PM org.eclipse.lsp4j.jsonrpc.services.GenericEndpoint notify
+INFO: Unsupported notification method: $/setTraceNotification
